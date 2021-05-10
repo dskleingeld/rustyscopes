@@ -1,0 +1,6 @@
+[workspace]
+members = [
+	"rustyscope-viewer",
+	"rustyscope-traits",
+	"scopes/rustyscope-nrf52832"
+]
