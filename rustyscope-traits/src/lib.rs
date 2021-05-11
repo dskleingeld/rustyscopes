@@ -24,6 +24,7 @@ pub enum Response<'a> {
 #[derive(Serialize, Deserialize, Debug)]
 pub enum ConfigErr {
     UnavailibleSampler(Sampler),
+    PinTaken(Pin),
     InvalidPin(Pin),
     InvalidRate(u32),
     Unimplemented,

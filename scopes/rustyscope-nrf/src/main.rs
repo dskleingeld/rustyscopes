@@ -45,16 +45,21 @@ enum AdcPin {
     P0_02(gpio::p0::P0_02<gpio::Disconnected>),
 }
 
+struct AdcPins {
+    p0_31: Option<gpio::p0::P0_31<gpio::Disconnected>>,
+    p0_02: Option<gpio::p0::P0_02<gpio::Disconnected>>,
+}
+
 struct Config {
     analog_enabled: ArrayVec<AdcPin, 8>,
-    analog_available: ArrayVec<AdcPin, 2>,
+    analog_available: AdcPins,
     resolution: u8,
 }
 
 impl Config {
-    fn from(analog_available: [AdcPin; 2]) -> Self {
+    fn from(analog_available: AdcPins) -> Self {
         Self {
-            analog_available: ArrayVec::from(analog_available),
+            analog_available,
             analog_enabled: ArrayVec::new(),
             resolution: 12,
         }
@@ -67,10 +72,22 @@ impl Config {
             ResetPins => self.analog_enabled.clear(),
             DigitalPins(pin) => Err(ConfigErr::Unimplemented)?,
             AnalogPins(pin) => {
-                if !ABILITIES.adc_pins.contains(&pin) {
-                    return Err(ConfigErr::InvalidPin(pin));
-                }
-                // self.analog_pins[sampler as usize] = Some(AdcPin::from(pin));
+                let adc_pin = match pin {
+                    2 => self
+                        .analog_available
+                        .p0_02
+                        .take()
+                        .ok_or(ConfigErr::PinTaken(pin))
+                        .map(|p| AdcPin::P0_02(p))?,
+                    31 => self
+                        .analog_available
+                        .p0_31
+                        .take()
+                        .ok_or(ConfigErr::PinTaken(pin))
+                        .map(|p| AdcPin::P0_31(p))?,
+                    _ => return Err(ConfigErr::InvalidPin(pin)),
+                };
+                self.analog_enabled.push(adc_pin);
             }
             AnalogRate(rate) => Err(ConfigErr::Unimplemented)?,
         }
@@ -123,7 +140,10 @@ async fn main(_spawner: Spawner) -> ! {
     // initialize saadc interface
     let saadc_config = SaadcConfig::default();
     let mut adc = Saadc::new(board.SAADC, saadc_config);
-    let analog_available = [AdcPin::P0_02(gpios.p0_02), AdcPin::P0_31(gpios.p0_31)];
+    let analog_available = AdcPins {
+        p0_02: Some(gpios.p0_02),
+        p0_31: Some(gpios.p0_31),
+    };
     let mut config = Config::from(analog_available);
     let mut mode = Mode::Idle;
     loop {
