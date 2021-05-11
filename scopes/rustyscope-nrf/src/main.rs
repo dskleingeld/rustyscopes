@@ -69,7 +69,12 @@ impl Config {
         use ConfigAction::*;
 
         match change {
-            ResetPins => self.analog_enabled.clear(),
+            ResetPins => for p in self.analog_enabled.drain(..) {
+                match p {
+                    AdcPin::P0_02(p02) => self.analog_available.p0_02 = Some(p02),
+                    AdcPin::P0_31(p31) => self.analog_available.p0_31 = Some(p31),
+                }
+            },
             DigitalPins(pin) => Err(ConfigErr::Unimplemented)?,
             AnalogPins(pin) => {
                 let adc_pin = match pin {
