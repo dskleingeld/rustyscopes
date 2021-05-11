@@ -1,5 +1,5 @@
 [package]
-name = "rustyscope-nrf52832"
+name = "rustyscope-nrf"
 version = "0.1.0"
 authors = ["dskleingeld <11743287+dskleingeld@users.noreply.github.com>"]
 edition = "2018"
@@ -31,3 +31,4 @@ futures = { version = "0.3", default-features = false, features = ["async-await"
 defmt = "0.2"
 defmt-rtt = "0.2"
 panic-probe = { version = "0.2", features = ["print-defmt"] }
+arrayvec = { version = "0.7", default-features = false }

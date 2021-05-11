@@ -2,5 +2,5 @@
 members = [
 	"rustyscope-viewer",
 	"rustyscope-traits",
-	"scopes/rustyscope-nrf52832"
+	"scopes/rustyscope-nrf"
 ]
