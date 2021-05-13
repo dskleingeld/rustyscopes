@@ -8,172 +8,52 @@
 
 mod defmt_setup;
 
-use arrayvec::ArrayVec;
-use defmt::panic;
+#[allow(unused_imports)]
+use defmt::panic; // needed for embassy main
 use embassy::executor::Spawner;
-use embassy::io::{AsyncBufReadExt, AsyncWriteExt};
-use embassy::time::{Duration, Timer};
-use embassy_nrf::gpio::NoPin;
-use embassy_nrf::{buffered_uarte::BufferedUarte, interrupt, uarte};
+// use embassy::time::{Duration, Timer};
 use futures::pin_mut;
 
 mod description;
-use description::ABILITIES;
-
-use embedded_hal::adc;
-use hal::{
-    gpio,
-    gpio::p0::Parts as P0Parts,
-    pac::Peripherals,
-    prelude::*,
-    saadc::{Saadc, SaadcConfig},
-};
+mod communications;
+mod config;
+mod sampling;
+mod mutex;
 use nrf52832_hal as hal;
-use rustyscope_traits::{Command, ConfigAction, ConfigErr, Response, SampleKind};
 
+use mutex::Mutex;
+use rustyscope_traits::{SampleKind, ConfigErr};
+
+#[allow(unused_imports)]
 use defmt_setup::*;
 
-enum Mode {
+#[derive(Copy, Clone)]
+pub enum Mode {
     Idle,
     Continues(SampleKind),
     Burst(SampleKind),
     Err(ConfigErr),
 }
 
-enum AdcPin {
-    P0_31(gpio::p0::P0_31<gpio::Disconnected>),
-    P0_02(gpio::p0::P0_02<gpio::Disconnected>),
-}
-
-struct AdcPins {
-    p0_31: Option<gpio::p0::P0_31<gpio::Disconnected>>,
-    p0_02: Option<gpio::p0::P0_02<gpio::Disconnected>>,
-}
-
-struct Config {
-    analog_enabled: ArrayVec<AdcPin, 8>,
-    analog_available: AdcPins,
-    resolution: u8,
-}
-
-impl Config {
-    fn from(analog_available: AdcPins) -> Self {
-        Self {
-            analog_available,
-            analog_enabled: ArrayVec::new(),
-            resolution: 12,
-        }
-    }
-
-    fn apply(&mut self, change: ConfigAction, adc: &mut Saadc) -> Result<(), ConfigErr> {
-        use ConfigAction::*;
-
-        match change {
-            ResetPins => for p in self.analog_enabled.drain(..) {
-                match p {
-                    AdcPin::P0_02(p02) => self.analog_available.p0_02 = Some(p02),
-                    AdcPin::P0_31(p31) => self.analog_available.p0_31 = Some(p31),
-                }
-            },
-            DigitalPins(pin) => Err(ConfigErr::Unimplemented)?,
-            AnalogPins(pin) => {
-                let adc_pin = match pin {
-                    2 => self
-                        .analog_available
-                        .p0_02
-                        .take()
-                        .ok_or(ConfigErr::PinTaken(pin))
-                        .map(|p| AdcPin::P0_02(p))?,
-                    31 => self
-                        .analog_available
-                        .p0_31
-                        .take()
-                        .ok_or(ConfigErr::PinTaken(pin))
-                        .map(|p| AdcPin::P0_31(p))?,
-                    _ => return Err(ConfigErr::InvalidPin(pin)),
-                };
-                self.analog_enabled.push(adc_pin);
-            }
-            AnalogRate(rate) => Err(ConfigErr::Unimplemented)?,
-        }
-
-        Ok(())
-    }
-}
-
-async fn sample<PIN>(adc: &mut Saadc, pin: &mut PIN)
-where
-    PIN: adc::Channel<Saadc, ID = u8>,
-{
-    let v = adc.read(pin).unwrap();
-    info!("value: {}", v);
-    Timer::after(Duration::from_secs(1)).await;
-}
-
 #[embassy::main]
 async fn main(_spawner: Spawner) -> ! {
     let p = embassy_nrf::Peripherals::take().unwrap();
-    let mut config = uarte::Config::default();
-    config.parity = uarte::Parity::EXCLUDED;
-    config.baudrate = uarte::Baudrate::BAUD115200;
+    #[allow(non_snake_case)]
+    let embassy_nrf::Peripherals{UARTE0, TIMER0, PPI_CH0, PPI_CH1, P0_08, P0_06, ..} = p;
 
     let mut tx_buffer = [0u8; 4096];
-    let mut rx_buffer = [0u8; 256]; // we only get commands and those are small
+    let mut rx_buffer = [0u8; 265];
+    let serial = communications::setup(UARTE0, TIMER0, PPI_CH0, PPI_CH1, P0_08, P0_06, &mut tx_buffer, &mut rx_buffer);
+    // pin_mut!(serial);
 
-    let irq = interrupt::take!(UARTE0_UART0);
-    let serial = unsafe {
-        BufferedUarte::new(
-            p.UARTE0,
-            p.TIMER0,
-            p.PPI_CH0,
-            p.PPI_CH1,
-            irq,
-            p.P0_08,
-            p.P0_06,
-            NoPin,
-            NoPin,
-            config,
-            &mut rx_buffer,
-            &mut tx_buffer,
-        )
-    };
-    pin_mut!(serial);
+    let config = config::Config::init();
 
-    let board = Peripherals::take().unwrap();
-    let gpios = P0Parts::new(board.P0);
+    let mode = Mutex::new(Mode::Idle, false);
 
-    // initialize saadc interface
-    let saadc_config = SaadcConfig::default();
-    let mut adc = Saadc::new(board.SAADC, saadc_config);
-    let analog_available = AdcPins {
-        p0_02: Some(gpios.p0_02),
-        p0_31: Some(gpios.p0_31),
-    };
-    let mut config = Config::from(analog_available);
-    let mut mode = Mode::Idle;
-    loop {
-        // let command = recieve_commands(serial);
-        let command = Command::Stop;
+    let sample = sampling::samle_loop(&mode, &config);
+    let send_data = communications::send_data(&serial);
+    let handle_commands = communications::handle_commands(&serial, &mode, &config);
 
-        mode = match command {
-            Command::Stop => Mode::Idle,
-            Command::Continues(s) => Mode::Continues(s),
-            Command::Burst(s) => Mode::Burst(s),
-            Command::Config(change) => match config.apply(change, &mut adc) {
-                Result::Ok(_) => mode,
-                Result::Err(e) => Mode::Err(e),
-            },
-        };
-
-        use Mode::*;
-        use SampleKind::*;
-        /* match mode {
-            Idle => (),
-            Continues(Analog) => (),
-            Continues(Digital) => (),
-            Burst(Analog) => (),
-            Burst(Digital) => (),
-            Err(e) => (),
-        } */
-    }
+    futures::join!(handle_commands, send_data, sample);
+    panic!("should not get here");
 }

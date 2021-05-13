@@ -27,6 +27,8 @@ embassy-traits = { git = "https://github.com/embassy-rs/embassy.git" }
 embassy-nrf = { git = "https://github.com/embassy-rs/embassy.git", features = ["52832"] }
 embassy = { git = "https://github.com/embassy-rs/embassy.git" }
 futures = { version = "0.3", default-features = false, features = ["async-await"] }
+futures-intrusive = { version = "0.4", default-features = false }
+lock_api = "0.4.1"
 
 defmt = "0.2"
 defmt-rtt = "0.2"

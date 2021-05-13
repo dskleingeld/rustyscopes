@@ -8,7 +8,7 @@ pub enum Mode {
     Burst(SampleKind),
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Copy, Clone)]
 pub enum SampleKind {
     Digital,
     Analog,
@@ -21,7 +21,7 @@ pub enum Response<'a> {
     Data(&'a[u8])
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, defmt::Format, Copy, Clone)]
 pub enum ConfigErr {
     UnavailibleSampler(Sampler),
     PinTaken(Pin),
@@ -33,7 +33,7 @@ pub enum ConfigErr {
 
 pub type Pin = u8;
 pub type Sampler = u8;
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Copy, Clone)]
 pub enum ConfigAction {
     ResetPins,
     /// add pin to listen to
