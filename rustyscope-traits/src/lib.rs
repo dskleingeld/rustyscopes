@@ -57,6 +57,18 @@ pub enum Command {
     Config(ConfigAction),
 }
 
+impl From<&[u8]> for Command {
+    fn from(s: &[u8]) -> Self {
+        postcard::from_bytes(s).unwrap()
+    }
+}
+
+impl Command {
+    fn serialize<'a>(&self, buf: &'a mut [u8]) -> &'a[u8] {
+        postcard::to_slice(self, buf).unwrap()
+    }
+}
+
 #[allow(dead_code)]
 pub struct Abilities {
     /// pins that can be configured to 

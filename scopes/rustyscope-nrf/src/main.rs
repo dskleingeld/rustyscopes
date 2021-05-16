@@ -22,6 +22,7 @@ mod mutex;
 use nrf52832_hal as hal;
 
 use mutex::Mutex;
+use communications::Serial;
 use rustyscope_traits::{SampleKind, ConfigErr};
 
 #[allow(unused_imports)]
@@ -35,6 +36,17 @@ pub enum Mode {
     Err(ConfigErr),
 }
 
+use embassy_nrf::peripherals::{UARTE0, TIMER0};
+use embassy_nrf::buffered_uarte::BufferedUarte;
+use core::pin::Pin;
+async fn test<'d>(serial: &Mutex<Pin<&mut BufferedUarte<'d, UARTE0, TIMER0>>>) {
+    let mut s = serial.lock().await;
+
+    let mut buf = [0u8; 8];
+    use embassy::io::AsyncBufReadExt;
+    s.read_exact(&mut buf);
+}
+
 #[embassy::main]
 async fn main(_spawner: Spawner) -> ! {
     let p = embassy_nrf::Peripherals::take().unwrap();
@@ -43,17 +55,27 @@ async fn main(_spawner: Spawner) -> ! {
 
     let mut tx_buffer = [0u8; 4096];
     let mut rx_buffer = [0u8; 265];
-    let serial = communications::setup(UARTE0, TIMER0, PPI_CH0, PPI_CH1, P0_08, P0_06, &mut tx_buffer, &mut rx_buffer);
-    // pin_mut!(serial);
+    let uart = Serial::setup_uart(UARTE0, TIMER0, PPI_CH0, PPI_CH1, P0_08, P0_06, &mut tx_buffer, &mut rx_buffer);
+    pin_mut!(uart);
+    let serial = Serial (Mutex::new(uart, true));
+    // let serial = Serial::from_pinned_uart(uart);
+    // let serial = communications::setup(UARTE0, TIMER0, PPI_CH0, PPI_CH1, P0_08, P0_06, &mut tx_buffer, &mut rx_buffer);
+    // let serial = Mutex::new(serial, false);
+    // test(&serial).await;
+    // let serial = serial.into_ref();
 
     let config = config::Config::init();
 
     let mode = Mutex::new(Mode::Idle, false);
 
-    let sample = sampling::samle_loop(&mode, &config);
-    let send_data = communications::send_data(&serial);
-    let handle_commands = communications::handle_commands(&serial, &mode, &config);
+    // serial.read_command();
 
-    futures::join!(handle_commands, send_data, sample);
+    /* let sample = sampling::samle_loop(&mode, &config);
+    let send_data = communications::send_data(serial);
+    let handle_commands = communications::handle_commands(serial, &mode, &config);
+
+    futures::join!(handle_commands, send_data, sample); */
+    drop(serial);
+    drop(uart);
     panic!("should not get here");
 }
