@@ -1,5 +1,5 @@
 #![no_std]
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, Debug)]
 pub enum Mode {
@@ -18,7 +18,7 @@ pub enum SampleKind {
 pub enum Response<'a> {
     Ok,
     Err(ConfigErr),
-    Data(&'a[u8])
+    Data(&'a [u8]),
 }
 
 #[derive(Serialize, Deserialize, Debug, defmt::Format, Copy, Clone)]
@@ -49,8 +49,8 @@ pub enum Command {
     Stop,
     /// start sampling while sending back data
     Continues(SampleKind),
-    /// start to sample as fast as possible, this can not be interrupted 
-    /// once stated as the device stops listening to uart 
+    /// start to sample as fast as possible, this can not be interrupted
+    /// once stated as the device stops listening to uart
     /// until it is done
     Burst(SampleKind),
     /// configure sampling
@@ -64,14 +64,14 @@ impl From<&[u8]> for Command {
 }
 
 impl Command {
-    fn serialize<'a>(&self, buf: &'a mut [u8]) -> &'a[u8] {
+    fn serialize<'a>(&self, buf: &'a mut [u8]) -> &'a [u8] {
         postcard::to_slice(self, buf).unwrap()
     }
 }
 
 #[allow(dead_code)]
 pub struct Abilities {
-    /// pins that can be configured to 
+    /// pins that can be configured to
     /// listen on
     pub adc_pins: &'static [Pin],
     /// resolution in bits

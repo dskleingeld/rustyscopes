@@ -13,10 +13,10 @@ use crate::Mode;
 use crate::mutex::Mutex;
 use crate::config::Config;
 
-pub struct Serial<'d>(pub Mutex<Pin<&'d mut BufferedUarte<'d, UARTE0, TIMER0>>>);
+pub struct Serial<'a,'d>(pub Mutex<Pin<&'a mut BufferedUarte<'d, UARTE0, TIMER0>>>);
 
 
-impl<'d> Serial<'d> {
+impl<'a,'d> Serial<'a,'d> {
     pub fn setup_uart(
         uart: UARTE0,
         timer: TIMER0,
@@ -38,7 +38,7 @@ impl<'d> Serial<'d> {
             )
         }
     }
-    pub fn from_pinned_uart(uart: Pin<&'d mut BufferedUarte<'d, UARTE0, TIMER0>>) -> Serial<'d> {
+    pub fn from_pinned_uart(uart: Pin<&'a mut BufferedUarte<'d, UARTE0, TIMER0>>) -> Self {
         Self(Mutex::new(uart, true))
     }
 

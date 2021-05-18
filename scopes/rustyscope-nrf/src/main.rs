@@ -12,6 +12,7 @@ mod defmt_setup;
 use defmt::panic; // needed for embassy main
 use embassy::executor::Spawner;
 // use embassy::time::{Duration, Timer};
+use core::marker::PhantomPinned;
 use futures::pin_mut;
 
 mod description;
@@ -47,6 +48,8 @@ async fn test<'d>(serial: &Mutex<Pin<&mut BufferedUarte<'d, UARTE0, TIMER0>>>) {
     s.read_exact(&mut buf);
 }
 
+pub struct Test<'d, 'a>(pub Mutex<core::pin::Pin<&'d mut BufferedUarte<'a, embassy_nrf::peripherals::UARTE0, embassy_nrf::peripherals::TIMER0>>>);
+
 #[embassy::main]
 async fn main(_spawner: Spawner) -> ! {
     let p = embassy_nrf::Peripherals::take().unwrap();
@@ -57,25 +60,16 @@ async fn main(_spawner: Spawner) -> ! {
     let mut rx_buffer = [0u8; 265];
     let uart = Serial::setup_uart(UARTE0, TIMER0, PPI_CH0, PPI_CH1, P0_08, P0_06, &mut tx_buffer, &mut rx_buffer);
     pin_mut!(uart);
-    let serial = Serial (Mutex::new(uart, true));
-    // let serial = Serial::from_pinned_uart(uart);
-    // let serial = communications::setup(UARTE0, TIMER0, PPI_CH0, PPI_CH1, P0_08, P0_06, &mut tx_buffer, &mut rx_buffer);
-    // let serial = Mutex::new(serial, false);
-    // test(&serial).await;
-    // let serial = serial.into_ref();
-
+    let serial = Serial::from_pinned_uart(uart);
     let config = config::Config::init();
 
     let mode = Mutex::new(Mode::Idle, false);
 
-    // serial.read_command();
+    serial.read_command();
 
-    /* let sample = sampling::samle_loop(&mode, &config);
-    let send_data = communications::send_data(serial);
-    let handle_commands = communications::handle_commands(serial, &mode, &config);
+    let sample = sampling::samle_loop(&mode, &config);
+    // let send_data = communications::send_data(serial);
+    // let handle_commands = communications::handle_commands(serial, &mode, &config);
 
-    futures::join!(handle_commands, send_data, sample); */
-    drop(serial);
-    drop(uart);
-    panic!("should not get here");
+    // futures::join!(handle_commands, send_data, sample);
 }
