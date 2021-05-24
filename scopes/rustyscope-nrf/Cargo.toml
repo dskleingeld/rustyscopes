@@ -24,7 +24,7 @@ embedded-hal = { version = "0.2.4", features = ["unproven"]}
 nrf52832-hal = "0.12.1"
 
 embassy-traits = { git = "https://github.com/embassy-rs/embassy.git" }
-embassy-nrf = { git = "https://github.com/embassy-rs/embassy.git", features = ["52832"] }
+embassy-nrf = { git = "https://github.com/embassy-rs/embassy.git", features = ["nrf52832"] }
 embassy = { git = "https://github.com/embassy-rs/embassy.git" }
 futures = { version = "0.3", default-features = false, features = ["async-await"] }
 futures-intrusive = { version = "0.4", default-features = false }

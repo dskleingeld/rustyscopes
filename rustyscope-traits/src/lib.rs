@@ -1,4 +1,6 @@
-#![no_std]
+
+#![feature(array_methods)]
+#![cfg_attr(not(test), no_std)]
 use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -8,7 +10,7 @@ pub enum Mode {
     Burst(SampleKind),
 }
 
-#[derive(Serialize, Deserialize, Debug, Copy, Clone)]
+#[derive(Serialize, Deserialize, Debug, Copy, Clone, PartialEq)]
 pub enum SampleKind {
     Digital,
     Analog,
@@ -33,7 +35,7 @@ pub enum ConfigErr {
 
 pub type Pin = u8;
 pub type Sampler = u8;
-#[derive(Serialize, Deserialize, Debug, Copy, Clone)]
+#[derive(Serialize, Deserialize, Debug, Copy, Clone, PartialEq)]
 pub enum ConfigAction {
     ResetPins,
     /// add pin to listen to
@@ -43,7 +45,7 @@ pub enum ConfigAction {
     AnalogRate(u32),
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, PartialEq)]
 pub enum Command {
     /// Stop continues sampling
     Stop,
@@ -57,15 +59,15 @@ pub enum Command {
     Config(ConfigAction),
 }
 
-impl From<&[u8]> for Command {
-    fn from(s: &[u8]) -> Self {
+impl From<&[u8; 6]> for Command {
+    fn from(s: &[u8; 6]) -> Self {
         postcard::from_bytes(s).unwrap()
     }
 }
 
 impl Command {
-    fn serialize<'a>(&self, buf: &'a mut [u8]) -> &'a [u8] {
-        postcard::to_slice(self, buf).unwrap()
+    fn serialize<'a>(&self, buf: &'a mut [u8; 6]) {
+        postcard::to_slice(self, buf).unwrap();
     }
 }
 
@@ -78,4 +80,35 @@ pub struct Abilities {
     pub adc_res: &'static [u8],
     /// voltage reference options
     pub adc_ref: &'static [&'static str],
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    const COMMANDS: [Command; 5] = [
+        Command::Stop,
+        Command::Continues(SampleKind::Analog),
+        Command::Burst(SampleKind::Digital),
+        Command::Config(ConfigAction::AnalogPins(0u8)),
+        Command::Config(ConfigAction::AnalogRate(0u32)),
+    ];
+
+    #[test]
+    fn not_to_short() {
+        let mut buf = [0u8; 6];
+        for cmd in &COMMANDS {
+            cmd.serialize(&mut buf);
+        }
+    }
+
+    #[test]
+    fn serialize_deserialize() {
+        for cmd in &COMMANDS {
+            let mut buf = [0u8; 6];
+            cmd.serialize(&mut buf);
+            let deserialized =Command::from(&buf);
+            assert_eq!(&deserialized, cmd);
+        }
+    }
 }

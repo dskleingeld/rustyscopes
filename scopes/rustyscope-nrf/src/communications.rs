@@ -45,17 +45,16 @@ impl<'a,'d> Serial<'a,'d> {
     pub async fn read_command(&self) -> Command {
         let mut m = self.0.lock().await;
         let serial = m.deref_mut();
-        let mut buf = [0u8; 8];
-        serial.read_exact(&mut buf);
-        // Command::from(buf)
-        Command::Stop
+        let mut buf = [0u8; 6];
+        serial.read_exact(&mut buf).await;
+        Command::from(&buf)
     }
 }
-/*
-pub async fn handle_commands<'d>(serial: Pin<&Serial<'d>>, mode: &Mutex<Mode>, config: &Config) {
+
+pub async fn handle_commands<'a, 'd>(serial: &Serial<'a, 'd>, mode: &Mutex<Mode>, config: &Config) {
     loop {
         // serial.
-        let command = Command::Stop;
+        let command = serial.read_command().await;
 
         let mut m = mode.lock().await;
         let new_mode = m.deref_mut();
@@ -71,4 +70,4 @@ pub async fn handle_commands<'d>(serial: Pin<&Serial<'d>>, mode: &Mutex<Mode>, c
     }
 }
 
-pub async fn send_data<'d>(serial: Pin<&Serial<'d>>) {} */
+// pub async fn send_data<'d>(serial: Pin<&Serial<'d>>) {}
