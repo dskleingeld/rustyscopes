@@ -46,22 +46,22 @@ use core::pin::Pin;
 #[embassy::main]
 async fn main(_spawner: Spawner, p: Peripherals) -> ! {
     #[allow(non_snake_case)]
-    let embassy_nrf::Peripherals{UARTE0, TIMER0, PPI_CH0, PPI_CH1, P0_08, P0_06, ..} = p;
+    let embassy_nrf::Peripherals{UARTE0, TIMER0, PPI_CH0, PPI_CH1, P0_08, P0_06, P0_05, P0_07, ..} = p;
 
     let mut tx_buffer = [0u8; 4096];
     let mut rx_buffer = [0u8; 265];
-    let uart = Serial::setup_uart(UARTE0, TIMER0, PPI_CH0, PPI_CH1, P0_08, P0_06, &mut tx_buffer, &mut rx_buffer);
+    let uart = Serial::setup_uart(UARTE0, P0_08, P0_06, P0_05, P0_07);
     pin_mut!(uart);
     let serial = Serial::from_pinned_uart(uart);
     let config = config::Config::init();
 
     let mode = Mutex::new(Mode::Idle, false);
 
-    serial.read_command().await;
-
     let sample = sampling::samle_loop(&mode, &config);
-    // let send_data = communications::send_data(serial);
+    let send_data = communications::send_data(&serial);
     let handle_commands = communications::handle_commands(&serial, &mode, &config);
 
+    handle_commands.await;
     // futures::join!(handle_commands, send_data, sample);
+    defmt::error!("should never get here");
 }

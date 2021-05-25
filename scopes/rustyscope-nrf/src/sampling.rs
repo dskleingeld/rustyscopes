@@ -28,17 +28,17 @@ where
     PIN: adc::Channel<Saadc, ID = u8>,
 {
     let v = adc.read(pin).unwrap();
-    info!("value: {}", v);
+    // info!("value: {}", v);
     Timer::after(Duration::from_secs(1)).await;
 }
 
 pub async fn samle_loop(mode: &Mutex<Mode>, config: &Config) {
     loop {
         use SampleKind::*;
-
         let m = mode.lock().await;
-        match &m.deref() {
-            Mode::Idle => (),
+        let m = *&m.deref();
+        match m {
+            Mode::Idle => Timer::after(Duration::from_millis(100)).await,
             Mode::Continues(Analog) => (),
             Mode::Continues(Digital) => (),
             Mode::Burst(Analog) => (),

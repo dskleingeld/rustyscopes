@@ -68,7 +68,7 @@ impl InnerConfig {
             DigitalPins(pin) => Err(ConfigErr::Unimplemented)?,
             AnalogPins(pin) => {
                 let adc_pin = match pin {
-                    2 => self
+                    2 => self // TODO turn into macro
                         .analog_available
                         .p0_02
                         .take()
