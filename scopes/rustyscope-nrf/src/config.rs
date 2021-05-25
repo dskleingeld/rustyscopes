@@ -17,7 +17,7 @@ struct AdcPins {
 struct InnerConfig {
     analog_enabled: ArrayVec<AdcPin, 8>,
     analog_available: AdcPins,
-    resolution: u8,
+    // resolution: u8,
 }
 
 pub struct Config (Mutex<InnerConfig>);
@@ -49,7 +49,7 @@ impl InnerConfig {
                 p0_31: Some(gpios.p0_31),
             },
             analog_enabled: ArrayVec::new(),
-            resolution: 12,
+            // resolution: 12,
         }
     }
 

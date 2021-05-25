@@ -14,7 +14,6 @@ use defmt::panic; // needed for embassy main
 use embassy_nrf::Peripherals;
 use embassy::executor::Spawner;
 // use embassy::time::{Duration, Timer};
-use core::marker::PhantomPinned;
 use futures::pin_mut;
 
 mod description;
@@ -31,7 +30,7 @@ use rustyscope_traits::{SampleKind, ConfigErr};
 #[allow(unused_imports)]
 use defmt_setup::*;
 
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, defmt::Format)]
 pub enum Mode {
     Idle,
     Continues(SampleKind),
@@ -39,17 +38,11 @@ pub enum Mode {
     Err(ConfigErr),
 }
 
-use embassy_nrf::peripherals::{UARTE0, TIMER0};
-use embassy_nrf::buffered_uarte::BufferedUarte;
-use core::pin::Pin;
-
 #[embassy::main]
 async fn main(_spawner: Spawner, p: Peripherals) -> ! {
     #[allow(non_snake_case)]
-    let embassy_nrf::Peripherals{UARTE0, TIMER0, PPI_CH0, PPI_CH1, P0_08, P0_06, P0_05, P0_07, ..} = p;
+    let embassy_nrf::Peripherals{UARTE0, P0_08, P0_06, P0_05, P0_07, ..} = p;
 
-    let mut tx_buffer = [0u8; 4096];
-    let mut rx_buffer = [0u8; 265];
     let uart = Serial::setup_uart(UARTE0, P0_08, P0_06, P0_05, P0_07);
     pin_mut!(uart);
     let serial = Serial::from_pinned_uart(uart);
@@ -61,7 +54,6 @@ async fn main(_spawner: Spawner, p: Peripherals) -> ! {
     let send_data = communications::send_data(&serial);
     let handle_commands = communications::handle_commands(&serial, &mode, &config);
 
-    handle_commands.await;
-    // futures::join!(handle_commands, send_data, sample);
+    futures::join!(handle_commands, send_data, sample);
     defmt::error!("should never get here");
 }

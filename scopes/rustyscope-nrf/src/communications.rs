@@ -1,16 +1,12 @@
-use embassy_nrf::gpio::NoPin;
 use embassy_nrf::peripherals::{P0_05, P0_06, P0_07, P0_08};
-use embassy_nrf::peripherals::{PPI_CH0, PPI_CH1, TIMER0, UARTE0};
+use embassy_nrf::peripherals::UARTE0;
 use embassy_nrf::{uarte, interrupt};
 use embassy_nrf::uarte::Uarte;
 use embassy::traits::uart::{Read, Write};
-use embassy_nrf::buffered_uarte::BufferedUarte;
 use rustyscope_traits::{Command, Reply};
 use core::pin::Pin;
-use futures::pin_mut;
-use core::ops::{Deref, DerefMut};
+use core::ops::DerefMut;
 use core::convert::TryFrom;
-use defmt::info;
 
 use crate::Mode;
 use crate::mutex::Mutex;
@@ -47,7 +43,7 @@ impl<'a,'d> Serial<'a,'d> {
         let mut m = self.0.lock().await;
         let serial = m.deref_mut();
         let mut buf = [0u8; Command::SIZE];
-        serial.read(&mut buf).await;
+        serial.read(&mut buf).await.unwrap();
         Command::try_from(&buf).unwrap()
     }
 
@@ -55,32 +51,38 @@ impl<'a,'d> Serial<'a,'d> {
         let mut m = self.0.lock().await;
         let serial = m.deref_mut();
         let buf = reply.serialize();
-        serial.write(&buf).await;
+        serial.write(&buf).await.unwrap();
     }
 }
 
 pub async fn handle_commands<'a, 'd>(serial: &Serial<'a, 'd>, mode: &Mutex<Mode>, config: &Config) {
     loop {
-        // serial.
         let command = serial.read_command().await;
-        defmt::debug!("command is: {}", command);
+        defmt::info!("got command: {}", command);
 
-        let mut m = mode.lock().await;
-        let new_mode = m.deref_mut();
-        *new_mode = match command {
-            Command::Stop => Mode::Idle,
-            Command::Continues(s) => Mode::Continues(s),
-            Command::Burst(s) => Mode::Burst(s),
+        let new_mode = match command {
+            Command::Stop => Some(Mode::Idle),
+            Command::Continues(s) => Some(Mode::Continues(s)),
+            Command::Burst(s) => Some(Mode::Burst(s)),
             Command::Config(change) => match config.apply(change).await {
-                Result::Ok(_) => *new_mode,
+                Result::Ok(_) => None, //*new_mode,
                 Result::Err(e) => {
                     let reply = Reply::Err(e);
                     serial.send_reply(reply).await;
-                    Mode::Err(e)
+                    Some(Mode::Err(e))
                 }
             },
         };
+
+        if let Some(new) = new_mode {
+            let mut m = mode.lock().await;
+            let mode = m.deref_mut();
+            *mode = new;
+        }
     }
 }
 
-pub async fn send_data<'d,'a>(serial: &Serial<'d,'a>) {}
+pub async fn send_data<'d,'a>(serial: &Serial<'d,'a>) {
+    use futures_lite::future;
+    future::yield_now().await
+}
