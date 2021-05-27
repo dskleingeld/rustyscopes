@@ -1,6 +1,6 @@
-use crate::hal::gpio;
 use crate::hal::saadc::Saadc;
-use embedded_hal::adc::{self, OneShot};
+use crate::hal::pac::SAADC;
+use embedded_hal::adc::OneShot;
 use embassy::time::{Timer, Duration};
 use rustyscope_traits::SampleKind;
 use crate::Mode;
@@ -9,29 +9,21 @@ use crate::mutex::Mutex;
 
 use core::ops::{Deref, DerefMut};
 
-/* let saadc_config = SaadcConfig::default();
-let mut adc = Saadc::new(board.SAADC, saadc_config); */
+use crate::AdcPin;
+use futures_intrusive::channel::LocalChannel;
+pub type Channel = LocalChannel<i16, [i16; 32]>;
 
-enum AdcPin {
-    P0_31(gpio::p0::P0_31<gpio::Disconnected>),
-    P0_02(gpio::p0::P0_02<gpio::Disconnected>),
+fn sample(adc: &mut Saadc, pin: &mut AdcPin) -> i16 {
+    match pin {
+        AdcPin::P0_31(p) => adc.read(p).unwrap(),
+        AdcPin::P0_02(p) => adc.read(p).unwrap(),
+    }
 }
 
-struct AdcPins {
-    p0_31: Option<gpio::p0::P0_31<gpio::Disconnected>>,
-    p0_02: Option<gpio::p0::P0_02<gpio::Disconnected>>,
-}
+pub async fn sample_loop(mode: &Mutex<Mode>, config: &Config, channel: &Channel, saadc: SAADC) {
+    let saadc_config = crate::hal::saadc::SaadcConfig::default();
+    let mut adc = Saadc::new(saadc, saadc_config);
 
-// async fn sample<PIN>(adc: &mut Saadc, pin: &mut PIN)
-// where
-//     PIN: adc::Channel<Saadc, ID = u8>,
-// {
-//     let v = adc.read(pin).unwrap();
-//     // info!("value: {}", v);
-//     Timer::after(Duration::from_secs(1)).await;
-// }
-
-pub async fn samle_loop(mode: &Mutex<Mode>, config: &Config) {
     loop {
         use SampleKind::*;
         let curr_mode = {
@@ -42,7 +34,15 @@ pub async fn samle_loop(mode: &Mutex<Mode>, config: &Config) {
 
         match curr_mode {
             Mode::Idle => Timer::after(Duration::from_millis(500)).await,
-            Mode::Continues(Analog) => Timer::after(Duration::from_millis(500)).await,
+            Mode::Continues(Analog) => {
+                let mut guard = config.0.lock().await;
+                let config = guard.deref_mut();
+                for pin in &mut config.analog_enabled {
+                    let val = sample(&mut adc, pin);
+                    channel.send(val).await.unwrap();
+                }
+                Timer::after(Duration::from_millis(500)).await;
+            }
             Mode::Continues(Digital) => Timer::after(Duration::from_millis(500)).await,
             Mode::Burst(Analog) => Timer::after(Duration::from_millis(500)).await,
             Mode::Burst(Digital) => Timer::after(Duration::from_millis(500)).await,

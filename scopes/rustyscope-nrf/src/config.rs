@@ -1,10 +1,11 @@
 use arrayvec::ArrayVec;
 use rustyscope_traits::{ConfigAction, ConfigErr};
 use crate::hal::gpio;
+use crate::hal::pac;
 use crate::Mutex;
+use core::ops::DerefMut;
 
-
-enum AdcPin {
+pub enum AdcPin {
     P0_31(gpio::p0::P0_31<gpio::Disconnected>),
     P0_02(gpio::p0::P0_02<gpio::Disconnected>),
 }
@@ -14,34 +15,34 @@ struct AdcPins {
     p0_02: Option<gpio::p0::P0_02<gpio::Disconnected>>,
 }
 
-struct InnerConfig {
-    analog_enabled: ArrayVec<AdcPin, 8>,
+pub struct InnerConfig {
+    pub analog_enabled: ArrayVec<AdcPin, 8>,
     analog_available: AdcPins,
     // resolution: u8,
 }
 
-pub struct Config (Mutex<InnerConfig>);
+pub struct Config (pub Mutex<InnerConfig>);
 
 impl Config {
-    pub fn init() -> Self {
-        Self(Mutex::new(InnerConfig::init(), true))
+    pub fn from_gpios(p0: pac::P0) -> Self {
+        Self(Mutex::new(InnerConfig::from_gpios(p0), true))
     }
     pub async fn apply(&self, change: ConfigAction) -> Result<(), ConfigErr> {
-        use core::ops::DerefMut;
-
         let mut guard = self.0.lock().await;
         let config = guard.deref_mut();
         config.apply(change)
     }
+    // pub async fn analog_enabled<'a>(&'a self) { 
+    //     let mut guard = self.0.lock().await;
+    //     let config = guard.deref_mut();
+    //     config.analog_enabled()
+    // }
 }
 
 impl InnerConfig {
-    pub fn init() -> Self {
+    pub fn from_gpios(p0: pac::P0) -> Self {
         use crate::hal::gpio::p0::Parts;
-        use crate::hal::pac::Peripherals;
-
-        let board = Peripherals::take().unwrap();
-        let gpios = Parts::new(board.P0);
+        let gpios = Parts::new(p0);
 
         Self {
             analog_available: AdcPins {
@@ -65,7 +66,7 @@ impl InnerConfig {
                     }
                 }
             }
-            DigitalPins(pin) => Err(ConfigErr::Unimplemented)?,
+            DigitalPins(_pin) => Err(ConfigErr::Unimplemented)?,
             AnalogPins(pin) => {
                 let adc_pin = match pin {
                     2 => self // TODO turn into macro
@@ -84,7 +85,7 @@ impl InnerConfig {
                 };
                 self.analog_enabled.push(adc_pin);
             }
-            AnalogRate(rate) => Err(ConfigErr::Unimplemented)?,
+            AnalogRate(_rate) => Err(ConfigErr::Unimplemented)?,
         }
 
         Ok(())

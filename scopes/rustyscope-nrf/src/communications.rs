@@ -11,6 +11,7 @@ use core::convert::TryFrom;
 use crate::Mode;
 use crate::mutex::Mutex;
 use crate::config::Config;
+use crate::sampling::Channel;
 
 pub struct Serial<'a,'d>(pub Mutex<Pin<&'a mut Uarte<'d, UARTE0>>>);
 
@@ -53,6 +54,18 @@ impl<'a,'d> Serial<'a,'d> {
         let buf = reply.serialize();
         serial.write(&buf).await.unwrap();
     }
+
+    pub async fn send_data(&self, data: &[i16]) {
+        defmt::info!("hi");
+        let mut m = self.0.lock().await;
+        let serial = m.deref_mut();
+        defmt::info!("got lock");
+        let buf = Reply::Data(data.len() as u32).serialize();
+        serial.write(&buf).await.unwrap();
+        defmt::info!("send data header");
+        let buf = bytemuck::cast_slice(data);
+        serial.write(buf).await.unwrap();
+    }
 }
 
 pub async fn handle_commands<'a, 'd>(serial: &Serial<'a, 'd>, mode: &Mutex<Mode>, config: &Config) {
@@ -82,7 +95,16 @@ pub async fn handle_commands<'a, 'd>(serial: &Serial<'a, 'd>, mode: &Mutex<Mode>
     }
 }
 
-pub async fn send_data<'d,'a>(serial: &Serial<'d,'a>) {
-    use futures_lite::future;
-    future::yield_now().await
+pub async fn send_data<'d,'a>(serial: &Serial<'d,'a>, channel: &Channel) {
+    let mut data = [0i16;8];
+    loop {
+        defmt::debug!("start");
+        for i in &mut data {
+            *i = channel.receive().await.unwrap();
+            defmt::debug!("got data");
+        }
+        defmt::debug!("starting send");
+        serial.send_data(&data).await;
+        defmt::debug!("send data");
+    }
 }

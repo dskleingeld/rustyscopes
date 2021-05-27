@@ -20,11 +20,13 @@ fn print_incoming(mut serial: Box<dyn SerialPort>) {
     use std::io::ErrorKind::TimedOut;
     let mut buf = [0u8; Command::SIZE];
     loop {
+        dbg!();
         match serial.read_exact(&mut buf) {
             Err(e) if e.kind() == TimedOut => continue, 
             Err(e) => panic!("{}", e),
             Ok(()) => (),
         }
+        dbg!();
         
         let len = match Reply::try_from(&buf).unwrap() {
             Reply::Ok => continue,
@@ -32,7 +34,9 @@ fn print_incoming(mut serial: Box<dyn SerialPort>) {
             Reply::Data(len) => len,
         };
 
-        let data = vec![0u8; len as usize];
+        println!("reading {} bytes of data", len);
+        let mut data = vec![0u8; len as usize];
+        serial.read_exact(&mut data).unwrap();
         println!("got data len: {}", data.len());
     }
 }
@@ -43,7 +47,7 @@ fn main(args: Args) -> Result<(), std::io::Error> {
     let mut serial = serialport::new(args.port.to_str().unwrap(), 9600)
         .parity(serialport::Parity::None)
         .flow_control(serialport::FlowControl::Hardware)
-        .timeout(Duration::from_secs(2))
+        .timeout(Duration::from_secs(20))
         .open()
         .unwrap();
 
