@@ -10,4 +10,6 @@ edition = "2018"
 rustyscope-traits = { path = "../rustyscope-traits" }
 ferrous-serialport = { version = "4.0.2", default-features = false }
 structopt = { version = "0.3", features = [ "paw" ] }
+byteorder = "1.4"
+plotly = "0.6.0"
 paw = "1.0"

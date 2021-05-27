@@ -56,7 +56,7 @@ async fn main(_spawner: Spawner, p: Peripherals) -> ! {
     let mode = Mutex::new(Mode::Idle, false);
     let channel = Channel::new();
 
-    let sample = sampling::sample_loop(&mode, &config, &channel, SAADC);
+    let sample = sampling::sample_loop(&serial, &mode, &config, &channel, SAADC);
     let send_data = communications::send_data(&serial, &channel);
     let handle_commands = communications::handle_commands(&serial, &mode, &config);
 

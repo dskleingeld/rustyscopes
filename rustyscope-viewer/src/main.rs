@@ -5,8 +5,11 @@ use std::thread;
 use rustyscope_traits::{Command, Reply, SampleKind, ConfigAction};
 use ferrous_serialport as serialport;
 use ferrous_serialport::SerialPort;
+use byteorder::{ByteOrder, LittleEndian};
 use std::path::PathBuf;
 use std::convert::TryFrom;
+
+mod plot;
 
 #[derive(structopt::StructOpt, Debug)]
 #[structopt(name = "scope viewer")]
@@ -16,29 +19,35 @@ struct Args {
     port: PathBuf,
 }
 
-fn print_incoming(mut serial: Box<dyn SerialPort>) {
+fn plot_burst(mut serial: Box<dyn SerialPort>) {
     use std::io::ErrorKind::TimedOut;
-    let mut buf = [0u8; Command::SIZE];
+    let mut bytes = Vec::new();
+
     loop {
-        dbg!();
+        let mut buf = [0u8; Command::SIZE];
         match serial.read_exact(&mut buf) {
             Err(e) if e.kind() == TimedOut => continue, 
             Err(e) => panic!("{}", e),
             Ok(()) => (),
         }
-        dbg!();
         
         let len = match Reply::try_from(&buf).unwrap() {
             Reply::Ok => continue,
             Reply::Err(config_err) => panic!("config err: {:?}", config_err),
             Reply::Data(len) => len,
+            Reply::Done => break,
         };
 
-        println!("reading {} bytes of data", len);
-        let mut data = vec![0u8; len as usize];
-        serial.read_exact(&mut data).unwrap();
-        println!("got data len: {}", data.len());
+        let mut buf = vec![0u8; len as usize];
+        serial.read_exact(&mut buf).unwrap();
+        bytes.append(&mut buf);
     }
+
+    let mut data = vec![0u16; bytes.len()/2];
+    LittleEndian::read_u16_into(&bytes, &mut data);
+    let data: Vec<f32> = data.drain(..).map(|v| v as f32).collect();
+    println!("data: {:?}", data);
+    plot::line_y(data.into_iter());
 }
 
 
@@ -52,7 +61,7 @@ fn main(args: Args) -> Result<(), std::io::Error> {
         .unwrap();
 
     let read_port = serial.try_clone().unwrap();
-    let handle = thread::spawn(move || print_incoming(read_port));
+    let handle = thread::spawn(move || plot_burst(read_port));
     
     let cmd = Command::Config(ConfigAction::ResetPins);
     serial.write_all(&cmd.serialize()).unwrap();
@@ -60,7 +69,12 @@ fn main(args: Args) -> Result<(), std::io::Error> {
     let cmd = Command::Config(ConfigAction::AnalogPins(2));
     serial.write_all(&cmd.serialize()).unwrap();
     
-    let cmd = Command::Continues(SampleKind::Analog);
+    let cmd = Command::Burst(SampleKind::Analog);
+    serial.write_all(&cmd.serialize()).unwrap();
+
+    thread::sleep(Duration::from_secs(5));
+
+    let cmd = Command::Stop;
     serial.write_all(&cmd.serialize()).unwrap();
     
 

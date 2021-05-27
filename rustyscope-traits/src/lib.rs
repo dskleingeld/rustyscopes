@@ -54,6 +54,7 @@ pub enum Command {
 
 #[derive(Serialize, Deserialize, Debug, PartialEq)]
 pub enum Reply {
+    Done,
     Data(u32),
     Err(ConfigErr),
     Ok,

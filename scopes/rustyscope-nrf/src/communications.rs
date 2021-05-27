@@ -40,6 +40,10 @@ impl<'a,'d> Serial<'a,'d> {
         Self(Mutex::new(uart, true))
     }
 
+    // TODO this blocks until a new command is recieved
+    // which keeps the mutex locked blocking sending
+    // need a serial that has seperate objects for 
+    // reading and writing
     pub async fn read_command(&self) -> Command {
         let mut m = self.0.lock().await;
         let serial = m.deref_mut();
@@ -56,15 +60,17 @@ impl<'a,'d> Serial<'a,'d> {
     }
 
     pub async fn send_data(&self, data: &[i16]) {
-        defmt::info!("hi");
         let mut m = self.0.lock().await;
         let serial = m.deref_mut();
-        defmt::info!("got lock");
-        let buf = Reply::Data(data.len() as u32).serialize();
-        serial.write(&buf).await.unwrap();
-        defmt::info!("send data header");
-        let buf = bytemuck::cast_slice(data);
-        serial.write(buf).await.unwrap();
+
+        let data = bytemuck::cast_slice(data);
+        for chunk in data.chunks(u8::MAX.into()) {
+            let data = Reply::Data(chunk.len() as u32).serialize();
+            serial.write(&data).await.unwrap();
+            serial.write(&chunk).await.unwrap();
+        }
+        let done = Reply::Done.serialize();
+        serial.write(&done).await.unwrap();
     }
 }
 
@@ -98,13 +104,9 @@ pub async fn handle_commands<'a, 'd>(serial: &Serial<'a, 'd>, mode: &Mutex<Mode>
 pub async fn send_data<'d,'a>(serial: &Serial<'d,'a>, channel: &Channel) {
     let mut data = [0i16;8];
     loop {
-        defmt::debug!("start");
         for i in &mut data {
             *i = channel.receive().await.unwrap();
-            defmt::debug!("got data");
         }
-        defmt::debug!("starting send");
         serial.send_data(&data).await;
-        defmt::debug!("send data");
     }
 }
