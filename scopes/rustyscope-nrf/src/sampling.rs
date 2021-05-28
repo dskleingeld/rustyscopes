@@ -1,9 +1,8 @@
 use crate::hal::saadc::Saadc;
 use crate::hal::pac::SAADC;
 use embedded_hal::adc::OneShot;
-use embassy::time::{Timer, Duration};
+use embassy::time::{Timer, Duration, Instant};
 use rustyscope_traits::SampleKind;
-use itertools::izip;
 use crate::Mode;
 use crate::Config;
 use crate::Mutex;
@@ -55,11 +54,16 @@ pub async fn sample_loop<'a, 'd>(serial: &Serial<'a, 'd>, mode: &Mutex<Mode>, co
                 let len = config.analog_enabled.len();
                 let pins = &mut config.analog_enabled;
                 let values = data.iter_mut();
+                let start = Instant::now();
                 for (i, val) in values.enumerate() {
-                    let pin = &mut pins[i % len];
+                    let idx = i % len;
+                    // defmt::info!("i: {}, idx: {}, len: {}", i, idx, len);
+                    let pin = &mut pins[idx];
                     *val = sample(&mut adc, pin);
                 }
-                serial.send_data(&data).await;
+                let duration = start.elapsed().as_micros();
+                serial.send_burst_data(&data, duration).await;
+
                 let mut new_mode = mode.lock().await;
                 let new_mode = new_mode.deref_mut();
                 *new_mode = Mode::Idle;

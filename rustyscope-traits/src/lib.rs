@@ -31,9 +31,9 @@ pub type Sampler = u8;
 #[derive(Serialize, Deserialize, Debug, defmt::Format, Copy, Clone, PartialEq)]
 pub enum ConfigAction {
     ResetPins,
-    /// add pin to listen to
+    /// add pin to measure
     DigitalPins(Pin),
-    /// add pin to listen to
+    /// add pin to measure
     AnalogPins(Pin),
     AnalogRate(u32),
 }
@@ -54,7 +54,7 @@ pub enum Command {
 
 #[derive(Serialize, Deserialize, Debug, PartialEq)]
 pub enum Reply {
-    Done,
+    Done(u32),
     Data(u32),
     Err(ConfigErr),
     Ok,

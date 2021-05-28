@@ -6,17 +6,35 @@ pub fn line_y(y: impl IntoIterator<Item=f32> + ExactSizeIterator) {
     line(x,y);
 }
 
-pub fn line(x: impl IntoIterator<Item=f32>, y: impl IntoIterator<Item=f32>) {
-    // let trace1 = Scatter::new(vec![1, 2, 3, 4], vec![10, 15, 13, 17])
-    //     .name("trace1")
-    //     .mode(Mode::Markers);
-    let trace2 = Scatter::new(x, y)
+pub fn two_lines(x: impl IntoIterator<Item=f32>, 
+    y1: impl IntoIterator<Item=f32>, 
+    y2: impl IntoIterator<Item=f32>) {
+
+    let mut x1 = x.into_iter();
+    let x2: Vec<f32> = x1.by_ref().collect();
+    let trace1 = Scatter::new(x1, y1)
+        .name("trace1")
+        .mode(Mode::Lines);
+    let trace2 = Scatter::new(x2, y2)
         .name("trace2")
         .mode(Mode::Lines);
 
     let mut plot = Plot::new();
-    // plot.add_trace(trace1);
+    plot.add_trace(trace1);
     plot.add_trace(trace2);
+
+    // The following will save the plot in all available formats and show the plot.
+    // plot.save("scatter", ImageFormat::PNG,  1024, 680, 1.0);
+    plot.show();
+}
+
+pub fn line(x: impl IntoIterator<Item=f32>, y: impl IntoIterator<Item=f32>) {
+    let trace = Scatter::new(x, y)
+        .name("trace2")
+        .mode(Mode::Lines);
+
+    let mut plot = Plot::new();
+    plot.add_trace(trace);
 
     // The following will save the plot in all available formats and show the plot.
     // plot.save("scatter", ImageFormat::PNG,  1024, 680, 1.0);

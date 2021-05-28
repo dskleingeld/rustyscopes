@@ -23,7 +23,7 @@ fn plot_burst(mut serial: Box<dyn SerialPort>) {
     use std::io::ErrorKind::TimedOut;
     let mut bytes = Vec::new();
 
-    loop {
+    let duration = loop {
         let mut buf = [0u8; Command::SIZE];
         match serial.read_exact(&mut buf) {
             Err(e) if e.kind() == TimedOut => continue, 
@@ -35,19 +35,25 @@ fn plot_burst(mut serial: Box<dyn SerialPort>) {
             Reply::Ok => continue,
             Reply::Err(config_err) => panic!("config err: {:?}", config_err),
             Reply::Data(len) => len,
-            Reply::Done => break,
+            Reply::Done(duration) => break duration,
         };
 
         let mut buf = vec![0u8; len as usize];
         serial.read_exact(&mut buf).unwrap();
         bytes.append(&mut buf);
-    }
+    };
 
+    println!("duration: {:?}", duration);
     let mut data = vec![0u16; bytes.len()/2];
     LittleEndian::read_u16_into(&bytes, &mut data);
     let data: Vec<f32> = data.drain(..).map(|v| v as f32).collect();
-    println!("data: {:?}", data);
-    plot::line_y(data.into_iter());
+    let y1: Vec<f32> = data.iter().step_by(2).copied().collect();
+    let y2: Vec<f32> = data.iter().skip(1).step_by(2).copied().collect();
+    let x: Vec<f32> = (0..data.len()).into_iter()
+        .map(|i| (i as f32)*(duration as f32)/1_000_000./(data.len() as f32))
+        .collect();
+    plot::line(x.clone(), y1.clone());
+    plot::two_lines(x, y1, y2);
 }
 
 
@@ -67,6 +73,8 @@ fn main(args: Args) -> Result<(), std::io::Error> {
     serial.write_all(&cmd.serialize()).unwrap();
 
     let cmd = Command::Config(ConfigAction::AnalogPins(2));
+    serial.write_all(&cmd.serialize()).unwrap();
+    let cmd = Command::Config(ConfigAction::AnalogPins(31));
     serial.write_all(&cmd.serialize()).unwrap();
     
     let cmd = Command::Burst(SampleKind::Analog);

@@ -59,7 +59,17 @@ impl<'a,'d> Serial<'a,'d> {
         serial.write(&buf).await.unwrap();
     }
 
-    pub async fn send_data(&self, data: &[i16]) {
+    pub async fn send_data(&self, data: [i16;8]) {
+        let mut m = self.0.lock().await;
+        let serial = m.deref_mut();
+
+        let buffer = bytemuck::cast_slice(&data);
+        let data = Reply::Data(data.len() as u32).serialize();
+        serial.write(&data).await.unwrap();
+        serial.write(&buffer).await.unwrap();
+    }
+
+    pub async fn send_burst_data(&self, data: &[i16], duration: u64) {
         let mut m = self.0.lock().await;
         let serial = m.deref_mut();
 
@@ -69,7 +79,7 @@ impl<'a,'d> Serial<'a,'d> {
             serial.write(&data).await.unwrap();
             serial.write(&chunk).await.unwrap();
         }
-        let done = Reply::Done.serialize();
+        let done = Reply::Done(duration as u32).serialize();
         serial.write(&done).await.unwrap();
     }
 }
@@ -107,6 +117,6 @@ pub async fn send_data<'d,'a>(serial: &Serial<'d,'a>, channel: &Channel) {
         for i in &mut data {
             *i = channel.receive().await.unwrap();
         }
-        serial.send_data(&data).await;
+        serial.send_data(data).await;
     }
 }
