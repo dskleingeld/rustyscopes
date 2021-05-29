@@ -10,8 +10,8 @@ pub fn two_lines(x: impl IntoIterator<Item=f32>,
     y1: impl IntoIterator<Item=f32>, 
     y2: impl IntoIterator<Item=f32>) {
 
-    let mut x1 = x.into_iter();
-    let x2: Vec<f32> = x1.by_ref().collect();
+    let x1: Vec<f32> = x.into_iter().collect();
+    let x2: Vec<f32> = x1.clone();
     let trace1 = Scatter::new(x1, y1)
         .name("trace1")
         .mode(Mode::Lines);
