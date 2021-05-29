@@ -16,8 +16,14 @@ pub type Channel = LocalChannel<i16, [i16; 32]>;
 
 fn sample(adc: &mut Saadc, pin: &mut AdcPin) -> i16 {
     match pin {
-        AdcPin::P0_31(p) => adc.read(p).unwrap(),
         AdcPin::P0_02(p) => adc.read(p).unwrap(),
+        AdcPin::P0_03(p) => adc.read(p).unwrap(),
+        AdcPin::P0_04(p) => adc.read(p).unwrap(),
+        AdcPin::P0_05(p) => adc.read(p).unwrap(),
+        AdcPin::P0_28(p) => adc.read(p).unwrap(),
+        AdcPin::P0_29(p) => adc.read(p).unwrap(),
+        AdcPin::P0_30(p) => adc.read(p).unwrap(),
+        AdcPin::P0_31(p) => adc.read(p).unwrap(),
     }
 }
 

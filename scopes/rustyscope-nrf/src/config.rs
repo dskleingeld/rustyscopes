@@ -6,13 +6,25 @@ use crate::Mutex;
 use core::ops::DerefMut;
 
 pub enum AdcPin {
-    P0_31(gpio::p0::P0_31<gpio::Disconnected>),
     P0_02(gpio::p0::P0_02<gpio::Disconnected>),
+    P0_03(gpio::p0::P0_03<gpio::Disconnected>),
+    P0_04(gpio::p0::P0_04<gpio::Disconnected>),
+    P0_05(gpio::p0::P0_05<gpio::Disconnected>),
+    P0_28(gpio::p0::P0_28<gpio::Disconnected>),
+    P0_29(gpio::p0::P0_29<gpio::Disconnected>),
+    P0_30(gpio::p0::P0_30<gpio::Disconnected>),
+    P0_31(gpio::p0::P0_31<gpio::Disconnected>),
 }
 
 struct AdcPins {
-    p0_31: Option<gpio::p0::P0_31<gpio::Disconnected>>,
     p0_02: Option<gpio::p0::P0_02<gpio::Disconnected>>,
+    p0_03: Option<gpio::p0::P0_03<gpio::Disconnected>>,
+    p0_04: Option<gpio::p0::P0_04<gpio::Disconnected>>,
+    p0_05: Option<gpio::p0::P0_05<gpio::Disconnected>>,
+    p0_28: Option<gpio::p0::P0_28<gpio::Disconnected>>,
+    p0_29: Option<gpio::p0::P0_29<gpio::Disconnected>>,
+    p0_30: Option<gpio::p0::P0_30<gpio::Disconnected>>,
+    p0_31: Option<gpio::p0::P0_31<gpio::Disconnected>>,
 }
 
 pub struct InnerConfig {
@@ -47,6 +59,12 @@ impl InnerConfig {
         Self {
             analog_available: AdcPins {
                 p0_02: Some(gpios.p0_02),
+                p0_03: Some(gpios.p0_03),
+                p0_04: Some(gpios.p0_04),
+                p0_05: Some(gpios.p0_05),
+                p0_28: Some(gpios.p0_28),
+                p0_29: Some(gpios.p0_29),
+                p0_30: Some(gpios.p0_30),
                 p0_31: Some(gpios.p0_31),
             },
             analog_enabled: ArrayVec::new(),
@@ -62,6 +80,12 @@ impl InnerConfig {
                 for p in self.analog_enabled.drain(..) {
                     match p {
                         AdcPin::P0_02(p02) => self.analog_available.p0_02 = Some(p02),
+                        AdcPin::P0_03(p03) => self.analog_available.p0_03 = Some(p03),
+                        AdcPin::P0_04(p04) => self.analog_available.p0_04 = Some(p04),
+                        AdcPin::P0_05(p05) => self.analog_available.p0_05 = Some(p05),
+                        AdcPin::P0_28(p28) => self.analog_available.p0_28 = Some(p28),
+                        AdcPin::P0_29(p29) => self.analog_available.p0_29 = Some(p29),
+                        AdcPin::P0_30(p30) => self.analog_available.p0_30 = Some(p30),
                         AdcPin::P0_31(p31) => self.analog_available.p0_31 = Some(p31),
                     }
                 }
@@ -75,6 +99,42 @@ impl InnerConfig {
                         .take()
                         .ok_or(ConfigErr::PinTaken(pin))
                         .map(|p| AdcPin::P0_02(p))?,
+                    3 => self // TODO turn into macro
+                        .analog_available
+                        .p0_03
+                        .take()
+                        .ok_or(ConfigErr::PinTaken(pin))
+                        .map(|p| AdcPin::P0_03(p))?,
+                    4 => self // TODO turn into macro
+                        .analog_available
+                        .p0_04
+                        .take()
+                        .ok_or(ConfigErr::PinTaken(pin))
+                        .map(|p| AdcPin::P0_04(p))?,
+                    5 => self // TODO turn into macro
+                        .analog_available
+                        .p0_05
+                        .take()
+                        .ok_or(ConfigErr::PinTaken(pin))
+                        .map(|p| AdcPin::P0_05(p))?,
+                    28 => self
+                        .analog_available
+                        .p0_28
+                        .take()
+                        .ok_or(ConfigErr::PinTaken(pin))
+                        .map(|p| AdcPin::P0_28(p))?,
+                    29 => self
+                        .analog_available
+                        .p0_29
+                        .take()
+                        .ok_or(ConfigErr::PinTaken(pin))
+                        .map(|p| AdcPin::P0_29(p))?,
+                    30 => self
+                        .analog_available
+                        .p0_30
+                        .take()
+                        .ok_or(ConfigErr::PinTaken(pin))
+                        .map(|p| AdcPin::P0_30(p))?,
                     31 => self
                         .analog_available
                         .p0_31
