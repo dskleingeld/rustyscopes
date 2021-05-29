@@ -10,6 +10,9 @@ use std::path::PathBuf;
 use std::convert::TryFrom;
 
 mod plot;
+const GAIN: f32 = 1.0/4.0;
+const REFV: f32 = 3.3/4.;
+const MAX_VOLT: f32 = REFV/GAIN;
 
 #[derive(structopt::StructOpt, Debug)]
 #[structopt(name = "scope viewer")]
@@ -35,7 +38,7 @@ fn plot_burst(mut serial: Box<dyn SerialPort>) {
             Reply::Ok => continue,
             Reply::Err(config_err) => panic!("config err: {:?}", config_err),
             Reply::Data(len) => len,
-            Reply::Done(duration) => break duration,
+            Reply::Done(duration) => break duration as f32/1_000_000.,
         };
 
         let mut buf = vec![0u8; len as usize];
@@ -43,16 +46,21 @@ fn plot_burst(mut serial: Box<dyn SerialPort>) {
         bytes.append(&mut buf);
     };
 
+    println!("MAX_VOLT: {}", MAX_VOLT);
     println!("duration: {:?}", duration);
     let mut data = vec![0u16; bytes.len()/2];
     LittleEndian::read_u16_into(&bytes, &mut data);
-    let data: Vec<f32> = data.drain(..).map(|v| v as f32).collect();
+    let data: Vec<f32> = data.drain(..)
+        .map(|v| v as f32)
+        .map(|v| v / (u16::MAX as f32) * MAX_VOLT*4.0)
+        .collect();
     let y1: Vec<f32> = data.iter().step_by(2).copied().collect();
     let y2: Vec<f32> = data.iter().skip(1).step_by(2).copied().collect();
     let x: Vec<f32> = (0..data.len()).into_iter()
-        .map(|i| (i as f32)*(duration as f32)/1_000_000./(data.len() as f32))
+        .map(|i| (i as f32)*duration/(data.len() as f32))
         .collect();
-    plot::line(x.clone(), y1.clone());
+    println!("mean {}", data.iter().sum::<f32>()/(data.len() as f32));
+    // plot::line(x.clone(), data);
     plot::two_lines(x, y1, y2);
 }
 
@@ -72,18 +80,21 @@ fn main(args: Args) -> Result<(), std::io::Error> {
     let cmd = Command::Config(ConfigAction::ResetPins);
     serial.write_all(&cmd.serialize()).unwrap();
 
-    let cmd = Command::Config(ConfigAction::AnalogPins(2));
+    let cmd = Command::Config(ConfigAction::AnalogPins(30));
     serial.write_all(&cmd.serialize()).unwrap();
     let cmd = Command::Config(ConfigAction::AnalogPins(31));
     serial.write_all(&cmd.serialize()).unwrap();
-    
+    let cmd = Command::Config(ConfigAction::AnalogRate(250));
+    serial.write_all(&cmd.serialize()).unwrap();
+
     let cmd = Command::Burst(SampleKind::Analog);
     serial.write_all(&cmd.serialize()).unwrap();
 
-    thread::sleep(Duration::from_secs(5));
-
-    let cmd = Command::Stop;
-    serial.write_all(&cmd.serialize()).unwrap();
+    loop {
+        thread::sleep(Duration::from_secs(1));
+        let cmd = Command::Stop;
+        serial.write_all(&cmd.serialize()).unwrap();
+    }
     
 
     handle.join().unwrap();
