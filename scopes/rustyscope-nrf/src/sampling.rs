@@ -28,7 +28,11 @@ fn sample(adc: &mut Saadc, pin: &mut AdcPin) -> i16 {
 }
 
 pub async fn sample_loop<'a, 'd>(serial: &Serial<'a, 'd>, mode: &Mutex<Mode>, config: &Config, channel: &Channel, saadc: SAADC) {
-    let saadc_config = crate::hal::saadc::SaadcConfig::default();
+    use crate::hal::saadc::{SaadcConfig, Reference, Gain};
+    let mut saadc_config = SaadcConfig { 
+        reference: Reference::VDD1_4,
+        gain: Gain::GAIN1_4,
+        ..SaadcConfig::default() };
     let mut adc = Saadc::new(saadc, saadc_config);
 
     loop {
@@ -61,11 +65,13 @@ pub async fn sample_loop<'a, 'd>(serial: &Serial<'a, 'd>, mode: &Mutex<Mode>, co
                 let pins = &mut config.analog_enabled;
                 let values = data.iter_mut();
                 let start = Instant::now();
+                let mut next = start;
                 for (i, val) in values.enumerate() {
                     let idx = i % len;
-                    // defmt::info!("i: {}, idx: {}, len: {}", i, idx, len);
                     let pin = &mut pins[idx];
+                    busy_wait_till(next);
                     *val = sample(&mut adc, pin);
+                    next += config.sample_period.unwrap_or(Duration::from_secs(0));
                 }
                 let duration = start.elapsed().as_micros();
                 serial.send_burst_data(&data, duration).await;
@@ -83,4 +89,8 @@ pub async fn sample_loop<'a, 'd>(serial: &Serial<'a, 'd>, mode: &Mutex<Mode>, co
             },
         }
     }
+}
+
+fn busy_wait_till(time: Instant) {
+    while Instant::now() < time { continue }
 }

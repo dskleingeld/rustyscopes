@@ -1,5 +1,6 @@
 use arrayvec::ArrayVec;
 use rustyscope_traits::{ConfigAction, ConfigErr};
+use embassy::time::Duration;
 use crate::hal::gpio;
 use crate::hal::pac;
 use crate::Mutex;
@@ -31,6 +32,7 @@ pub struct InnerConfig {
     pub analog_enabled: ArrayVec<AdcPin, 8>,
     analog_available: AdcPins,
     // resolution: u8,
+    pub sample_period: Option<Duration>
 }
 
 pub struct Config (pub Mutex<InnerConfig>);
@@ -44,11 +46,6 @@ impl Config {
         let config = guard.deref_mut();
         config.apply(change)
     }
-    // pub async fn analog_enabled<'a>(&'a self) { 
-    //     let mut guard = self.0.lock().await;
-    //     let config = guard.deref_mut();
-    //     config.analog_enabled()
-    // }
 }
 
 impl InnerConfig {
@@ -68,6 +65,7 @@ impl InnerConfig {
                 p0_31: Some(gpios.p0_31),
             },
             analog_enabled: ArrayVec::new(),
+            sample_period: None,
             // resolution: 12,
         }
     }
@@ -145,7 +143,7 @@ impl InnerConfig {
                 };
                 self.analog_enabled.push(adc_pin);
             }
-            AnalogRate(_rate) => Err(ConfigErr::Unimplemented)?,
+            AnalogRate(rate) => self.sample_period = Some(Duration::from_secs(1)/rate),
         }
 
         Ok(())
